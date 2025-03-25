@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Monthly Earnings Tracker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background: #fdfdfd;
+      color: #333;
+    }
+    h1 {
+      text-align: center;
+    }
+    select {
+      display: block;
+      margin: 10px auto 30px;
+      font-size: 16px;
+    }
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 10px;
+      margin-bottom: 30px;
+    }
+    .day {
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 8px;
+      border-radius: 10px;
+      text-align: center;
+    }
+    .day input {
+      width: 60px;
+      margin-top: 5px;
+    }
+    .gauge-container {
+      max-width: 600px;
+      height: 40px;
+      margin: 0 auto;
+      border-radius: 20px;
+      overflow: hidden;
+      position: relative;
+      border: 1px solid #ccc;
+    }
+    .gauge-fill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(to right,
+        red 0%,
+        orange 30%,
+        yellow 50%,
+        #9acd32 70%,
+        green 100%);
+      z-index: 0;
+    }
+    .gauge-mask {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 100%;
+      background: white;
+      z-index: 1;
+      transition: transform 0.5s ease;
+      transform-origin: left;
+    }
+    .milestones {
+      max-width: 600px;
+      margin: 20px auto;
+    }
+    .milestone {
+      padding: 5px 10px;
+    }
+    .achieved {
+      color: green;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>💼 Monthly Earnings Tracker</h1>
+
+  <select id="monthPicker"></select>
+
+  <div class="calendar" id="calendar"></div>
+
+  <div class="gauge-container">
+    <div class="gauge-fill"></div>
+    <div class="gauge-mask" id="gaugeMask"></div>
+  </div>
+
+  <div class="milestones" id="milestones"></div>
+
+  <script>
+    const hourlyRate = 30;
+    const milestones = [
+      { amount: 400, label: "💸 Taxes Paid" },
+      { amount: 950, label: "🏠 Rent Paid" },
+      { amount: 1215, label: "🔌 Bills Paid" },
+      { amount: 1500, label: "🥦 Groceries Paid" },
+      { amount: 1675, label: "🧘 Pilates Paid" },
+      { amount: 2065, label: "🍔 Deliveroo & Meals Paid" },
+      { amount: 2200, label: "✈️ Travel Savings" },
+      { amount: 3000, label: "🛟 You'll be Safe" },
+      { amount: 3400, label: "📈 Standard Performance" },
+      { amount: 3800, label: "💃 Go Girl" },
+      { amount: 4000, label: "🌟 This is Where We Wanna Be" },
+      { amount: 4500, label: "🔥 Wow... Just Wow..." }
+    ];
+
+    const calendar = document.getElementById("calendar");
+    const gaugeMask = document.getElementById("gaugeMask");
+    const milestoneDiv = document.getElementById("milestones");
+    const monthPicker = document.getElementById("monthPicker");
+
+    let currentYear = 2025;
+    let currentMonth = new Date().getMonth();
+    let earnings = [];
+
+    function populateMonthPicker() {
+      for (let month = 0; month < 12; month++) {
+        const date = new Date(2025, month);
+        const option = document.createElement("option");
+        option.value = `2025-${month}`;
+        option.textContent = date.toLocaleString("default", { month: "long", year: "numeric" });
+        if (month === currentMonth) {
+          option.selected = true;
+        }
+        monthPicker.appendChild(option);
+      }
+    }
+
+    function loadEarnings(year, month, days) {
+      const key = `earnings-${year}-${month}`;
+      const stored = localStorage.getItem(key);
+      return stored ? JSON.parse(stored) : Array(days).fill(0);
+    }
+
+    function saveEarnings(year, month) {
+      const key = `earnings-${year}-${month}`;
+      localStorage.setItem(key, JSON.stringify(earnings));
+    }
+
+    function createCalendar(year, month) {
+      calendar.innerHTML = "";
+      const days = new Date(year, month + 1, 0).getDate();
+      earnings = loadEarnings(year, month, days);
+
+      for (let i = 0; i < days; i++) {
+        const dayBox = document.createElement("div");
+        dayBox.className = "day";
+        dayBox.innerHTML = `
+          <strong>${i + 1}</strong><br/>
+          <input type="number" min="0" step="0.25" data-day="${i}" value="${earnings[i] || ''}" />
+        `;
+        calendar.appendChild(dayBox);
+      }
+      document.querySelectorAll("input[type='number']").forEach(input => {
+        input.addEventListener("input", updateEarnings);
+      });
+      updateEarnings();
+    }
+
+    function updateEarnings() {
+      const inputs = document.querySelectorAll("input[type='number']");
+      earnings = earnings.map((_, i) => {
+        const input = Array.from(inputs).find(inp => parseInt(inp.dataset.day) === i);
+        return input ? parseFloat(input.value) || 0 : 0;
+      });
+
+      const totalHours = earnings.reduce((a, b) => a + b, 0);
+      const totalEarnings = totalHours * hourlyRate;
+      const max = 5000;
+      const percent = Math.min((totalEarnings / max) * 100, 100);
+      gaugeMask.style.transform = `translateX(${percent}%)`;
+
+      milestoneDiv.innerHTML = milestones.map(m => {
+        return `<div class="milestone ${totalEarnings >= m.amount ? 'achieved' : ''}">${m.label} (${m.amount})</div>`;
+      }).join("");
+
+      saveEarnings(currentYear, currentMonth);
+    }
+
+    monthPicker.addEventListener("change", () => {
+      const [year, month] = monthPicker.value.split("-").map(Number);
+      currentYear = year;
+      currentMonth = month;
+      createCalendar(currentYear, currentMonth);
+    });
+
+    populateMonthPicker();
+    createCalendar(currentYear, currentMonth);
+  </script>
+</body>
+</html>
